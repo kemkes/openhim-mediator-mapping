@@ -9,6 +9,15 @@ The Mapping Mediator's function is to allow data validation, mapping, and orches
 
 Please see [our documentation page](https://jembi.github.io/openhim-mediator-mapping) for more details and our [YouTube setup Video](https://youtu.be/I6NTXZvJxW0) for a step by step guide.
 
+## Indonesian Adaptation
+For adaptation according to the context of the SATUSEHAT Platform in Indonesia, we added the following features:
+- Added a `condition` control parameter to Lookup requests and response requests to support conditional chaining
+- Selects specific content in the response lookup to be sent to the next request chain
+- Added jsonata expressions for headers in Lookup requests and response requests
+- TODO: internal template management system to support transformation to more complex formats ex: HL7 FHIR Standard Profiling
+- TODO: text autofill on HL7 FHIR `CodeableConcept.display`
+- TODO: output response sanitization
+
 ## Prerequisite
 
 To store endpoint data:
