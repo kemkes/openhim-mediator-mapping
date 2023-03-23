@@ -3,6 +3,7 @@
 const axios = require('axios')
 const {DateTime} = require('luxon')
 
+const jsonata = require('jsonata')
 const logger = require('../logger')
 const {OPENHIM_TRANSACTION_HEADER} = require('../constants')
 
@@ -35,6 +36,24 @@ const performLookupRequest = async (ctx, requestDetails) => {
     requestStart: reqTimestamp
   }
 
+  if (requestDetails.config.headers) {
+    Object.keys(requestDetails.config.headers).forEach(key => {
+      try {
+        const path = requestDetails.config.headers[`${key}`]
+
+        const expression = jsonata(path)
+        const headerValue = expression.evaluate(ctx.state.allData)
+        if (headerValue != null) {
+          requestDetails.config.headers[`${key}`] = headerValue
+        }else {
+          logger.debug(
+            `${ctx.state.metaData.name} (${ctx.state.uuid}): Request Header Value ${key} ( ${path} ) = ${headerValue}`
+          )
+        }
+      } catch(error) {}
+    })
+  }
+
   if (ctx.request.headers[OPENHIM_TRANSACTION_HEADER]) {
     requestDetails.config.headers = Object.assign(
       {
@@ -50,10 +69,17 @@ const performLookupRequest = async (ctx, requestDetails) => {
     requestDetails.config
   )
   const requestUrl = resolveRequestUrl(ctx, requestDetails.config)
-  const body = requestDetails.forwardExistingRequestBody
+  let body = requestDetails.forwardExistingRequestBody
     ? ctx.request.body
     : null
 
+  if (body && requestDetails.config.body) {
+    try {
+      const expression = jsonata(requestDetails.config.body)
+      body = expression.evaluate(body)
+    }catch(error) {}
+  }
+  
   const axiosConfig = prepareRequestConfig(
     requestDetails,
     body,
@@ -164,12 +190,21 @@ const performLookupRequestArray = async (ctx, request) => {
 
   const currentlyExecuting = []
   const allPromises = []
+  let i = 0
 
   for (const item of items) {
     const itemRequest = Object.assign({}, request)
     const itemCtx = Object.assign({}, ctx)
 
-    itemCtx.request.body = item
+    // itemCtx.request.body = item
+    if (request.forwardExistingRequestBody) {
+      itemCtx.request.body.item = item
+    } else {
+      itemCtx.request.body = item
+    }
+    itemCtx.request.body.itemIndex = i
+    i++
+
     itemCtx.state.allData.item = item
 
     const promise = makeQuerablePromise(
@@ -223,7 +258,30 @@ const performLookupRequests = (ctx, requests) => {
 const prepareLookupRequests = ctx => {
   const requests = Object.assign({}, ctx.state.metaData.requests)
   if (requests.lookup && requests.lookup.length > 0) {
-    const responseData = performLookupRequests(ctx, requests.lookup)
+
+    // Filter requests.lookup by condition
+    const filteredLookup = requests.lookup.filter(request => {
+      let condition = true
+      if (
+        request &&
+        request.config &&
+        request.config.condition
+      ) {
+        try {
+          const expression = jsonata(request.config.condition)
+          const requirement = expression.evaluate(ctx.state.allData)
+          condition = !!requirement
+          if (!condition) {
+            logger.debug(
+              `${ctx.state.metaData.name} (${ctx.state.uuid}): External Lookup Request ${request.id} unmatch required condition`
+            )
+          }
+        }catch(error) {}
+      }
+      return condition
+    })
+
+    const responseData = performLookupRequests(ctx, filteredLookup)
 
     return Promise.all(responseData)
       .then(data => {
@@ -239,7 +297,7 @@ const prepareLookupRequests = ctx => {
           with duplicate data.
         */
         const incomingData = Object.assign({}, ...data)
-        requests.lookup.forEach(lookupConfig => {
+        filteredLookup.forEach(lookupConfig => {
           const lookupResponse = incomingData[lookupConfig.id]
           if (Array.isArray(lookupResponse)) {
             lookupResponse.forEach((arrayResponseItem, index) => {
@@ -258,7 +316,8 @@ const prepareLookupRequests = ctx => {
         ctx.state.allData.lookupRequests = incomingData
       })
       .catch(error => {
-        throw new Error(`Rejected Promise: ${error}`)
+        // throw new Error(`Rejected Promise: ${error}`)
+        throw new Error(`Rejected Promise: ` + JSON.stringify(error))
       })
   }
   logger.debug(
@@ -390,6 +449,25 @@ const performResponseRequests = (ctx, requests) => {
       request.config.method &&
       request.id
     ) {
+
+      if (request.config.headers) {
+        Object.keys(request.config.headers).forEach(key => {
+          try {
+            const path = request.config.headers[`${key}`]
+
+            const expression = jsonata(path)
+            const headerValue = expression.evaluate(ctx.state.allData)
+            if (headerValue != null) {
+              request.config.headers[`${key}`] = headerValue
+            } else {
+              logger.debug(
+                `${ctx.state.metaData.name} (${ctx.state.uuid}): Header Value ${key} ( ${path} ) = ${headerValue}`
+              )
+            }
+          }catch(error) {}
+        })
+      }
+
       if (ctx.request.headers[OPENHIM_TRANSACTION_HEADER]) {
         request.config.headers = Object.assign(
           {
@@ -434,7 +512,30 @@ const prepareResponseRequests = async ctx => {
       Array.isArray(requests.response) &&
       requests.response.length
     ) {
-      const promises = performResponseRequests(ctx, requests.response)
+
+      // Filter requests.response by condition
+      const filteredResponse = requests.response.filter(request => {
+        let condition = true
+        if (
+          request &&
+          request.config &&
+          request.config.condition
+        ) {
+          try {
+            const expression = jsonata(request.config.condition)
+            const requirement = expression.evaluate(ctx.state.allData)
+            condition = !!requirement
+            if (!condition) {
+              logger.debug(
+                `${ctx.state.metaData.name} (${ctx.state.uuid}): External request ${request.id} unmatch required condition`
+              )
+            }
+          }catch(error) {}
+        }
+        return condition
+      })
+
+      const promises = performResponseRequests(ctx, filteredResponse)
 
       await Promise.all(promises)
         .then(() => {
@@ -446,7 +547,8 @@ const prepareResponseRequests = async ctx => {
           logger.error(
             `${ctx.state.metaData.name} (${ctx.state.uuid}): Mapped object orchestration failure: ${error.message}`
           )
-          throw new Error(`Rejected Promise: ${error}`)
+          // throw new Error(`Rejected Promise: ${error}`)
+          throw new Error(`Rejected Promise: ` + JSON.stringify(error))
         })
     }
   }
@@ -559,6 +661,13 @@ const performResponseRequest = (ctx, body, requestDetails) => {
 
   const params = addRequestQueryParameters(ctx, requestDetails.config)
   const requestUrl = resolveRequestUrl(ctx, requestDetails.config)
+
+  if (requestDetails.config.body) {
+    try {
+      const expression = jsonata(requestDetails.config.body)
+      body = expression.evaluate(body)
+    }catch(error) {}
+  }
 
   const axiosConfig = prepareRequestConfig(
     requestDetails,
@@ -691,6 +800,18 @@ const addRequestQueryParameters = (ctx, request) => {
 
 const resolveRequestUrl = (ctx, request) => {
   let url = request.url
+
+  logger.debug(
+    `${ctx.state.metaData.name} (${ctx.state.uuid}): resolveRequestUrl ${request.id} : ${url}`
+  )
+
+  try {
+    const expression = jsonata(url)
+    let u = expression.evaluate(ctx.state.allData)
+    if (u) {
+      url = u
+    }
+  }catch(error) {}
 
   if (request.params && request.params.url) {
     Object.keys(request.params.url).forEach(paramName => {
