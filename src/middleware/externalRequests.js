@@ -431,6 +431,9 @@ const performResponseRequestArray = async (ctx, request) => {
 }
 
 const performResponseRequests = (ctx, requests) => {
+  if (requests.length == 0)
+    return []
+
   //Create orchestrations
   if (!ctx.orchestrations) {
     ctx.orchestrations = []
