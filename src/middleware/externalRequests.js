@@ -3,7 +3,9 @@
 const axios = require('axios')
 const {DateTime} = require('luxon')
 
-const jsonata = require('jsonata')
+// const jsonata = require('jsonata')
+const {jsonataExecute, jsonataId} = require('../jsonataCache')
+
 const logger = require('../logger')
 const {OPENHIM_TRANSACTION_HEADER} = require('../constants')
 
@@ -41,8 +43,10 @@ const performLookupRequest = async (ctx, requestDetails) => {
       try {
         const path = requestDetails.config.headers[`${key}`]
 
-        const expression = jsonata(path)
-        const headerValue = expression.evaluate(ctx.state.allData)
+        // const expression = jsonata(path)
+        // const headerValue = expression.evaluate(ctx.state.allData)
+        const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#lookup-${requestDetails.id}#header-${key}`)
+        const headerValue = jsonataExecute(jsonataKey, path, ctx.state.allData)
         if (headerValue != null) {
           requestDetails.config.headers[`${key}`] = headerValue
         }else {
@@ -75,8 +79,10 @@ const performLookupRequest = async (ctx, requestDetails) => {
 
   if (body && requestDetails.config.body) {
     try {
-      const expression = jsonata(requestDetails.config.body)
-      body = expression.evaluate(body)
+      // const expression = jsonata(requestDetails.config.body)
+      // body = expression.evaluate(body)
+      const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#lookup-${requestDetails.id}#body`)
+      body = jsonataExecute(jsonataKey, requestDetails.config.body, body)
     }catch(error) {}
   }
   
@@ -268,8 +274,10 @@ const prepareLookupRequests = ctx => {
         request.config.condition
       ) {
         try {
-          const expression = jsonata(request.config.condition)
-          const requirement = expression.evaluate(ctx.state.allData)
+          // const expression = jsonata(request.config.condition)
+          // const requirement = expression.evaluate(ctx.state.allData)
+          const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#lookup-${request.id}#condition`)
+          const requirement = jsonataExecute(jsonataKey, request.config.condition, ctx.state.allData)
           condition = !!requirement
           if (!condition) {
             logger.debug(
@@ -458,8 +466,10 @@ const performResponseRequests = (ctx, requests) => {
           try {
             const path = request.config.headers[`${key}`]
 
-            const expression = jsonata(path)
-            const headerValue = expression.evaluate(ctx.state.allData)
+            // const expression = jsonata(path)
+            // const headerValue = expression.evaluate(ctx.state.allData)
+            const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#response-${request.id}#header-${key}`)
+            const headerValue = jsonataExecute(jsonataKey, path, ctx.state.allData)
             if (headerValue != null) {
               request.config.headers[`${key}`] = headerValue
             } else {
@@ -525,8 +535,10 @@ const prepareResponseRequests = async ctx => {
           request.config.condition
         ) {
           try {
-            const expression = jsonata(request.config.condition)
-            const requirement = expression.evaluate(ctx.state.allData)
+            // const expression = jsonata(request.config.condition)
+            // const requirement = expression.evaluate(ctx.state.allData)
+            const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#response-${request.id}#condition`)
+            const requirement = jsonataExecute(jsonataKey, request.config.condition, ctx.state.allData)
             condition = !!requirement
             if (!condition) {
               logger.debug(
@@ -667,8 +679,10 @@ const performResponseRequest = (ctx, body, requestDetails) => {
 
   if (requestDetails.config.body) {
     try {
-      const expression = jsonata(requestDetails.config.body)
-      body = expression.evaluate(body)
+      // const expression = jsonata(requestDetails.config.body)
+      // body = expression.evaluate(body)
+      const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#response-${requestDetails.id}#body`)
+      body = jsonataExecute(jsonataKey, requestDetails.config.body, body)
     }catch(error) {}
   }
 
@@ -809,8 +823,10 @@ const resolveRequestUrl = (ctx, request) => {
   )
 
   try {
-    const expression = jsonata(url)
-    let u = expression.evaluate(ctx.state.allData)
+    // const expression = jsonata(url)
+    // let u = expression.evaluate(ctx.state.allData)
+    const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#header-${request.id}#url`)
+    let u = jsonataExecute(jsonataKey, url, ctx.state.allData)
     if (u) {
       url = u
     }
