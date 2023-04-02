@@ -72,7 +72,7 @@ const performLookupRequest = async (ctx, requestDetails) => {
     ctx,
     requestDetails.config
   )
-  const requestUrl = resolveRequestUrl(ctx, requestDetails.config)
+  const requestUrl = resolveRequestUrl(ctx, requestDetails.config, requestDetails.id)
   let body = requestDetails.forwardExistingRequestBody
     ? ctx.request.body
     : null
@@ -675,7 +675,7 @@ const performResponseRequest = (ctx, body, requestDetails) => {
   }
 
   const params = addRequestQueryParameters(ctx, requestDetails.config)
-  const requestUrl = resolveRequestUrl(ctx, requestDetails.config)
+  const requestUrl = resolveRequestUrl(ctx, requestDetails.config, requestDetails.id)
 
   if (requestDetails.config.body) {
     try {
@@ -815,17 +815,17 @@ const addRequestQueryParameters = (ctx, request) => {
   return requestQueryParams
 }
 
-const resolveRequestUrl = (ctx, request) => {
+const resolveRequestUrl = (ctx, request, id) => {
   let url = request.url
 
   logger.debug(
-    `${ctx.state.metaData.name} (${ctx.state.uuid}): resolveRequestUrl ${request.id} : ${url}`
+    `${ctx.state.metaData.name} (${ctx.state.uuid}): resolveRequestUrl ${id} : ${url}`
   )
 
   try {
     // const expression = jsonata(url)
     // let u = expression.evaluate(ctx.state.allData)
-    const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#header-${request.id}#url`)
+    const jsonataKey = jsonataId('plain', `${ctx.state.metaData.name}#header-${id}#url`)
     let u = jsonataExecute(jsonataKey, url, ctx.state.allData)
     if (u) {
       url = u

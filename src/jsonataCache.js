@@ -16,6 +16,8 @@ const jsonataExecuteInternal = (identifier, expression, input, bindings, callbac
       expression: expr,
       expressionString: expression
     }
+
+    logger.debug(`JSONata Expression Register: ${identifier}`)
   } else {
     expr = cacheJsonata[identifier].expression
   }
@@ -28,7 +30,10 @@ const removeExpired = () => {
   if (now % gcThreshold > gcThreshold / 2) {
     Object.keys(cacheJsonata)
       .filter(k1 => cacheJsonata[k1].expired < now / 1000)
-      .forEach(k2 => delete cacheJsonata[k2])
+      .forEach(k2 => {
+        delete cacheJsonata[k2]
+        logger.debug(`JSONata Expression Expired: ${k2}`)
+      })
   }
 }
 
