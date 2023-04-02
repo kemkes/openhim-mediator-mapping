@@ -20,6 +20,7 @@ services:
       - authentication_jwt_secretOrPublicKey=secret
       - authentication_jwt_algorithms=HS256
       - authentication_jwt_issuer=openhim
+      - router_externalHostname=103.150.196.229
     ports:
       - "8080:8080"
       - "5000:5000"
@@ -32,5 +33,7 @@ services:
       - mapper-cluster-network
     ports:
       - "9000:80"
+    volumes:
+      - "./openhim-console.default.json:/usr/share/nginx/html/config/default.json"
     depends_on:
       - openhim-core
