@@ -1,0 +1,17 @@
+name: Publish Docker
+on:
+  push:
+    branches:
+      - docker-build
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Publish to Registry
+      uses: elgohr/Publish-Docker-Github-Action@v5
+      with:
+        name: kemenkesri/openhim-mediator-mapping
+        username: kemenkesri
+        password: SatuSehat@kemenkesRI
+        default_branch: docker-build
