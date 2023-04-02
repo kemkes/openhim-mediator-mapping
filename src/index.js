@@ -13,11 +13,17 @@ const openhim = require('./openhim')
 const {createAPIRoutes} = require('./endpointRoutes')
 const {createMiddlewareRoute} = require('./routes')
 
+const {createTemplateAPIRoutes} = require('./templateRoutes')
+const {createTemplateRoute} = require('./templates')
+
 const app = new koa()
 const router = new koaRouter()
 
 createAPIRoutes(router)
 createMiddlewareRoute(router)
+
+createTemplateAPIRoutes(router)
+createTemplateRoute(router)
 
 const millisecondsAtStart = DateTime.utc().ts
 

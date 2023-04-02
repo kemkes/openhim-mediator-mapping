@@ -9,6 +9,10 @@ const {
   removeEventListeners,
   setupEventListeners
 } = require('./services/endpoints/cache')
+const {
+  removeTemplateEventListeners,
+  setupTemplateEventListeners
+} = require('./services/templates/cache')
 
 let reconnectPromise = null
 let eventListenersSet = false
@@ -48,6 +52,7 @@ exports.open = mongoUrl => {
     logger.info(`Connected to mongo on ${mongoUrl}`)
     if (dynamicEndpoints && !eventListenersSet) {
       setupEventListeners()
+      setupTemplateEventListeners()
       eventListenersSet = true
     }
     if (reconnectPromise) {
@@ -60,6 +65,7 @@ exports.open = mongoUrl => {
 exports.close = async () => {
   if (dynamicEndpoints) {
     removeEventListeners()
+    removeTemplateEventListeners()
     eventListenersSet = false
   }
   await mongoose
