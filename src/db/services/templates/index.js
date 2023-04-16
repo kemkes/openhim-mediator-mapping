@@ -28,6 +28,10 @@ exports.updateTemplate = (templateId, body) => {
   })
 }
 
+exports.updateTemplates = (queryParams, body) => {
+  return TemplateModel.updateMany(queryParams, body)
+}
+
 exports.deleteTemplate = templateId => {
   const objectId = new ObjectId(templateId)
   return TemplateModel.deleteOne({_id: objectId})

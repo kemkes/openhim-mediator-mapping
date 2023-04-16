@@ -142,12 +142,43 @@ const updateTemplateRoute = router => {
         return next()
       }
 
+      const original = await templateServices.readTemplate(templateId)
+      if (!original)
+        return next()
+
+      if (original.extend === null) {
+        // berubah dari Root Template menjadi Sub-Template dan sudah punya anak
+        if (ctx.request.body.extend) {
+          const children = await templateServices.readTemplates({extend: original.name})
+          if (children && children.length > 0) {
+            throw Error('Root-template have children and cannot changed to Sub-Template')
+          }
+        }
+      }
+
       const body = Object.assign({lastUpdated: Date.now()}, ctx.request.body)
 
       await templateServices
         .updateTemplate(templateId, body)
         .then(result => {
           if (result) {
+            if (result.extend === null) {
+              // change target
+              if (result.target != original.target) {
+                templateServices.updateTemplates({ extend: original.name }, { $set: { target: result.target }})
+              }
+
+              // change type
+              if (result.type != original.type) {
+                templateServices.updateTemplates({ extend: original.name }, { $set: { type: result.type }})
+              }
+
+              // change name
+              if (result.name != original.name) {
+                templateServices.updateTemplates({ extend: original.name }, { $set: { extend: result.name }})
+              }
+            }
+
             ctx.status = 200
             ctx.body = result
             logger.info(

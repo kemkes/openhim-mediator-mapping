@@ -221,16 +221,6 @@ templateSchema.pre('save', async function (next) {
     return next()
 })
 
-templateSchema.post('findOneAndUpdate', async function (template, next) {
-  // updating root template
-  if (!template.extend) {
-    // TODO update all [target, type, extend] for sub-template
-  }
-
-  logger.debug(`Post-Update Template ${template.name}: ` + JSON.stringify(doc))
-  return next()
-})
-
 const TemplateModel = mongoose.model('template', templateSchema)
 
 module.exports = TemplateModel
