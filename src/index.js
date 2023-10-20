@@ -12,6 +12,8 @@ const openhim = require('./openhim')
 
 const {createAPIRoutes} = require('./endpointRoutes')
 const {createMiddlewareRoute} = require('./routes')
+const {initiateKafkaClient} = require('./kafka')
+const {readEndpoints} = require('./db/services/endpoints')
 
 const {createTemplateAPIRoutes} = require('./templateRoutes')
 const {createTemplateRoute} = require('./templates')
@@ -41,8 +43,11 @@ app.use(router.routes()).use(router.allowedMethods())
 if (!module.parent) {
   db.open(config.mongoUrl)
 
-  app.listen(config.port, () => {
+  app.listen(config.port, async () => {
     logger.info(`Server listening on port ${config.port}...`)
+
+    const endpoints = await readEndpoints({})
+    initiateKafkaClient(endpoints)
 
     if (config.openhim.register) {
       openhim.mediatorSetup()

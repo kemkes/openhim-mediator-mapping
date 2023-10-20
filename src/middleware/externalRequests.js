@@ -11,6 +11,7 @@ const {OPENHIM_TRANSACTION_HEADER} = require('../constants')
 
 const {createOrchestration} = require('../orchestrations')
 const {extractValueFromObject, makeQuerablePromise} = require('../util')
+const kafka = require('../kafka')
 
 const validateRequestStatusCode = allowedStatuses => {
   const stringStatuses = allowedStatuses.map(String)
@@ -249,11 +250,7 @@ const performLookupRequests = (ctx, requests) => {
   }
 
   return requests.map(async request => {
-    if (request.forEach) {
-      if (!request.forEach.items) {
-        throw new Error('forEach.items property must exist for forEach lookups')
-      }
-
+    if (request.forEach && request.forEach.items) {
       return performLookupRequestArray(ctx, request)
     }
 
@@ -309,13 +306,16 @@ const prepareLookupRequests = ctx => {
           const lookupResponse = incomingData[lookupConfig.id]
           if (Array.isArray(lookupResponse)) {
             lookupResponse.forEach((arrayResponseItem, index) => {
-              const parsedResponse = parseMediatorResponse(arrayResponseItem)
+              const parsedResponse = parseMediatorResponse(
+                ctx,
+                arrayResponseItem
+              )
               if (parsedResponse) {
                 incomingData[lookupConfig.id][index] = parsedResponse
               }
             })
           } else {
-            const parsedResponse = parseMediatorResponse(lookupResponse)
+            const parsedResponse = parseMediatorResponse(ctx, lookupResponse)
             if (parsedResponse) {
               incomingData[lookupConfig.id] = parsedResponse
             }
@@ -333,14 +333,21 @@ const prepareLookupRequests = ctx => {
   )
 }
 
-const parseMediatorResponse = lookupResponse => {
+const parseMediatorResponse = (ctx, lookupResponse) => {
   if (
     lookupResponse &&
-    lookupResponse['x-mediator-urn'] &&
-    lookupResponse.response
+    lookupResponse.data &&
+    lookupResponse.data['x-mediator-urn'] &&
+    lookupResponse.data.response &&
+    lookupResponse.data.response.body
   ) {
     try {
-      return JSON.parse(lookupResponse.response.body)
+      if (!ctx.orchestrations) {
+        ctx.orchestrations = []
+      }
+      ctx.orchestrations.push(...lookupResponse.data.orchestrations)
+
+      return {data: JSON.parse(lookupResponse.data.response.body)}
     } catch (error) {
       logger.debug(
         `No stringified JSON. Therefore no parsing needed: ${error.message}`
@@ -455,10 +462,9 @@ const performResponseRequests = (ctx, requests) => {
   return requests.map(request => {
     if (
       request &&
-      request.config &&
-      request.config.url &&
-      request.config.method &&
-      request.id
+      request.id &&
+      ((request.config && request.config.url && request.config.method) ||
+        request.kafkaProducerTopic)
     ) {
 
       if (request.config.headers) {
@@ -499,13 +505,7 @@ const performResponseRequests = (ctx, requests) => {
         requests[0].primary = true
       }
 
-      if (request.forEach) {
-        if (!request.forEach.items) {
-          throw new Error(
-            'forEach.items property must exist for forEach response'
-          )
-        }
-
+      if (request.forEach && request.forEach.items) {
         return performResponseRequestArray(ctx, request)
       }
 
@@ -666,6 +666,17 @@ const setKoaResponseBody = (ctx, request, body) => {
 }
 
 const performResponseRequest = (ctx, body, requestDetails) => {
+  if (requestDetails.kafkaProducerTopic) {
+    return kafka
+      .sendToKafka(requestDetails.kafkaProducerTopic, body)
+      .then(res => {
+        ctx.body = res
+      })
+      .catch(err => {
+        ctx.body = err.message
+      })
+  }
+
   const reqTimestamp = DateTime.utc().toISO()
   let response, orchestrationError, responseTimestamp
 
