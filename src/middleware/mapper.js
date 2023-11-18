@@ -33,6 +33,14 @@ const createMappedObject = ctx => {
       output,
       objectMapper(dataToBeMapped, ctx.state.metaData.inputMapping)
     )
+
+    // merge wildcard '*' key to output response
+    if (output['*'] && typeof output['*'] === 'object') {
+      const wildcard = output['*'];
+      delete output['*'];
+      Object.assign(output, wildcard);
+    }
+
   } catch (error) {
     logger.error(
       `${ctx.state.metaData.name} (${ctx.state.uuid}): Object mapping failed: ${error.message}`
